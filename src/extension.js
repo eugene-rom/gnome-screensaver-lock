@@ -28,10 +28,8 @@ function _onProxyReady(o, res)
     try
     {
         _cancellable = null;
-
         _proxy = Gio.DBusProxy.new_finish(res);
-
-        _lockActionId = _lockActionBtn.connect('clicked', _onLockClicked);
+        _lockActionId = _lockActionBtn.connect( 'activate', _onLockClicked );
     }
     catch ( e ) {
         Main.notifyError( 'gnome-screensaver-lock: ' + e );
@@ -42,7 +40,7 @@ function enable()
 {
     _lockAction = Main.panel.statusArea.aggregateMenu._system._systemActions._actions.get("lock-screen");
     _lockAction.available = false;
-    _lockActionBtn = Main.panel.statusArea.aggregateMenu._system._lockScreenAction;
+    _lockActionBtn = Main.panel.statusArea.aggregateMenu._system._lockScreenItem;
 
     systemMenu = Main.panel.statusArea['aggregateMenu']._system;
     _cancellable = new Gio.Cancellable();
