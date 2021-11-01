@@ -41,6 +41,7 @@ function enable()
     _lockAction = Main.panel.statusArea.aggregateMenu._system._systemActions._actions.get("lock-screen");
     _lockAction.available = false;
     _lockActionBtn = Main.panel.statusArea.aggregateMenu._system._lockScreenItem;
+    Main.panel.statusArea.aggregateMenu._system._lockScreenItem.visible = true;
 
     systemMenu = Main.panel.statusArea['aggregateMenu']._system;
     _cancellable = new Gio.Cancellable();
