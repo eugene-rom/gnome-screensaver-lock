@@ -3,9 +3,8 @@
 const Gio = imports.gi.Gio;
 const Main = imports.ui.main;
 const Util = imports.misc.util;
-const BoxPointer = imports.ui.boxpointer;
 
-let systemMenu, _cancellable, _proxy, _lockActionBtn, _lockActionId, _lockAction;
+let systemMenu, _cancellable, _proxy, _lockActionBtn, _lockActionId;
 
 function _onProxyCallFailure(o, res)
 {
@@ -19,7 +18,8 @@ function _onProxyCallFailure(o, res)
 }
 
 function _onLockClicked() {
-    systemMenu.menu.itemActivated( BoxPointer.PopupAnimation.NONE );
+    Main.overview.hide();
+    Main.panel.closeQuickSettings();
     _proxy.call( "Lock", null, Gio.DBusCallFlags.NONE, -1, null, _onProxyCallFailure );
 }
 
@@ -29,7 +29,7 @@ function _onProxyReady(o, res)
     {
         _cancellable = null;
         _proxy = Gio.DBusProxy.new_finish(res);
-        _lockActionId = _lockActionBtn.connect( 'activate', _onLockClicked );
+        _lockActionId = _lockActionBtn.connect( 'clicked', _onLockClicked );
     }
     catch ( e ) {
         Main.notifyError( 'gnome-screensaver-lock: ' + e );
@@ -38,12 +38,9 @@ function _onProxyReady(o, res)
 
 function enable()
 {
-    _lockAction = Main.panel.statusArea.aggregateMenu._system._systemActions._actions.get("lock-screen");
-    _lockAction.available = false;
-    _lockActionBtn = Main.panel.statusArea.aggregateMenu._system._lockScreenItem;
-    Main.panel.statusArea.aggregateMenu._system._lockScreenItem.visible = true;
+    _lockActionBtn = Main.panel.statusArea.quickSettings._system._systemItem.child.get_children()[5];
+    _lockActionBtn.visible = true;
 
-    systemMenu = Main.panel.statusArea['aggregateMenu']._system;
     _cancellable = new Gio.Cancellable();
     Gio.DBusProxy.new(Gio.DBus.session,
                       Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES | Gio.DBusProxyFlags.DO_NOT_CONNECT_SIGNALS | Gio.DBusProxyFlags.DO_NOT_AUTO_START,
@@ -57,9 +54,9 @@ function enable()
 
 function disable()
 {
-    _lockAction.available = true;
     _lockActionBtn.disconnect( _lockActionId );
     if (_cancellable) {
         _cancellable.cancel();
     }
 }
+

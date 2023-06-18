@@ -1,7 +1,7 @@
 {
   "description": "Replace shell Lock button action to call gnome-screensaver",
   "name": "gnome-screensaver lock button",
-  "shell-version": [ "3.36", "3.38", "40" ],
+  "shell-version": [ "43" ],
   "uuid": "gnome-screensaver-lock@gs.eros2.info",
-  "version": 3
+  "version": 4
 }
