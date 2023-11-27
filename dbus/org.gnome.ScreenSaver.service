@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.gnome.ScreenSaver
+Exec=/usr/bin/gnome-screensaver
+#Exec=/usr/bin/xss-lock /usr/bin/i3lock
