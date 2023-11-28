@@ -3,5 +3,5 @@
   "name": "gnome-screensaver lock button",
   "shell-version": [ "43" ],
   "uuid": "gnome-screensaver-lock@gs.eros2.info",
-  "version": 5
+  "version": 6
 }
