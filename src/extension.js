@@ -36,6 +36,21 @@ function _onProxyReady(o, res)
     }
 }
 
+function _reset_kbd_layout()
+{
+    const sourceman = imports.ui.status.keyboard.getInputSourceManager();
+
+    if ( !sourceman ) {
+        return;
+    }
+
+    const idx = sourceman.currentSource.index;
+
+    if ( idx !== 0 ) {
+        sourceman.inputSources[0].activate( true );
+    }
+}
+
 function enable()
 {
     _lockAction = Main.panel.statusArea.aggregateMenu._system._systemActions._actions.get("lock-screen");
@@ -53,6 +68,11 @@ function enable()
                       "org.gnome.ScreenSaver",
                       _cancellable,
                       _onProxyReady);
+
+    Gio.DBus.session.signal_subscribe( null, "org.gnome.ScreenSaver", "ActiveChanged", "/org/gnome/ScreenSaver", null,
+            Gio.DBusSignalFlags.NONE, (connection, sender, path, iface, signal, params) => {
+                _reset_kbd_layout();
+            } );
 }
 
 function disable()
