@@ -5,36 +5,17 @@ const Main = imports.ui.main;
 const Util = imports.misc.util;
 const BoxPointer = imports.ui.boxpointer;
 
-let systemMenu, _cancellable, _proxy, _lockActionBtn, _lockActionId, _lockAction;
+let _systemMenu, _shieldOnStatusChanged, _shieldActivate, _shieldLock, _shieldDeactivate;
 
-function _onProxyCallFailure(o, res)
-{
-    try {
-        o.call_finish(res);
-    }
-    catch ( e ) {
-        // Make one last-ditch attempt by having the D-Bus call done externally
-        Util.spawn( ['gnome-screensaver-command', '-l'] );
-    }
-}
+function _lock() {
+    Main.overview.hide();
+    _systemMenu.menu.itemActivated( BoxPointer.PopupAnimation.NONE );
+    Util.spawn( ['gnome-screensaver-command', '-l'] );
+};
 
-function _onLockClicked() {
-    systemMenu.menu.itemActivated( BoxPointer.PopupAnimation.NONE );
-    _proxy.call( "Lock", null, Gio.DBusCallFlags.NONE, -1, null, _onProxyCallFailure );
-}
-
-function _onProxyReady(o, res)
-{
-    try
-    {
-        _cancellable = null;
-        _proxy = Gio.DBusProxy.new_finish(res);
-        _lockActionId = _lockActionBtn.connect( 'activate', _onLockClicked );
-    }
-    catch ( e ) {
-        Main.notifyError( 'gnome-screensaver-lock: ' + e );
-    }
-}
+function _unlock() {
+    Util.spawn( ['gnome-screensaver-command', '-d'] );
+};
 
 function _reset_kbd_layout()
 {
@@ -53,21 +34,25 @@ function _reset_kbd_layout()
 
 function enable()
 {
-    _lockAction = Main.panel.statusArea.aggregateMenu._system._systemActions._actions.get("lock-screen");
-    _lockAction.available = false;
-    _lockActionBtn = Main.panel.statusArea.aggregateMenu._system._lockScreenItem;
-    Main.panel.statusArea.aggregateMenu._system._lockScreenItem.visible = true;
+    _systemMenu = Main.panel.statusArea['aggregateMenu']._system;
 
-    systemMenu = Main.panel.statusArea['aggregateMenu']._system;
-    _cancellable = new Gio.Cancellable();
-    Gio.DBusProxy.new(Gio.DBus.session,
-                      Gio.DBusProxyFlags.DO_NOT_LOAD_PROPERTIES | Gio.DBusProxyFlags.DO_NOT_CONNECT_SIGNALS | Gio.DBusProxyFlags.DO_NOT_AUTO_START,
-                      null,
-                      "org.gnome.ScreenSaver",
-                      "/org/gnome/ScreenSaver",
-                      "org.gnome.ScreenSaver",
-                      _cancellable,
-                      _onProxyReady);
+    _shieldOnStatusChanged = Main.screenShield._onStatusChanged;
+    _shieldActivate = Main.screenShield.activate;
+    _shieldLock = Main.screenShield.lock;
+    _shieldDeactivate = Main.screenShield.deactivate;
+
+    Main.screenShield._onStatusChanged = (status) => {}; // prevents gnome shell message "error: Unable to lock: Lock was blocked by an application"
+    Main.screenShield.activate = (animate) => { _lock(); };
+    Main.screenShield.lock = (animate) => { _lock(); };
+    Main.screenShield.deactivate = (animate) => { _unlock(); };
+
+    // hack to release dbus name
+    let id = Gio.DBus.session.own_name('org.gnome.ScreenSaver', Gio.BusNameOwnerFlags.REPLACE, null, null);
+    for ( let i = 0; i <= id; i++ ) {
+        Gio.DBus.session.unown_name(i);
+    }
+
+    Util.spawn( ['gnome-screensaver'] );
 
     Gio.DBus.session.signal_subscribe( null, "org.gnome.ScreenSaver", "ActiveChanged", "/org/gnome/ScreenSaver", null,
             Gio.DBusSignalFlags.NONE, (connection, sender, path, iface, signal, params) => {
@@ -77,9 +62,17 @@ function enable()
 
 function disable()
 {
-    _lockAction.available = true;
-    _lockActionBtn.disconnect( _lockActionId );
-    if (_cancellable) {
-        _cancellable.cancel();
+    if ( _shieldOnStatusChanged ) {
+        Main.screenShield._onStatusChanged = _shieldOnStatusChanged;
+    }
+    if ( _shieldActivate ) {
+        Main.screenShield.activate = _shieldActivate;
+    }
+    if ( _shieldLock ) {
+        Main.screenShield.lock = _shieldLock;
+    }
+    if ( _shieldDeactivate ) {
+        Main.screenShield.deactivate = _shieldDeactivate;
     }
 }
+
