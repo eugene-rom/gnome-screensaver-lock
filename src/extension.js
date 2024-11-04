@@ -1,65 +1,89 @@
 /* global imports */
 
-const Main = imports.ui.main;
-const Util = imports.misc.util;
+import Gio from 'gi://Gio'
 
-let _shieldOnStatusChanged, _shieldActivate, _shieldLock, _shieldDeactivate;
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Util from 'resource:///org/gnome/shell/misc/util.js';
+import * as Keyboard from 'resource:///org/gnome/shell/ui/status/keyboard.js';
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-function _lock() { 
-    Main.overview.hide();
-    Main.panel.closeQuickSettings();
-    Util.spawn( ['gnome-screensaver-command', '-l'] );
-};
-
-function _unlock() { 
-    Util.spawn( ['gnome-screensaver-command', '-d'] );
-};
-
-function enable()
+export default class GnomeScreenSaverHack extends Extension
 {
-    _shieldOnStatusChanged = null;
-    _shieldActivate = null;
-    _shieldLock = null;
-    _shieldDeactivate = null;
-    
-    let _lockActionBtn = null;
-    let arr = Main.panel.statusArea.quickSettings._system._systemItem.child.get_children();
-    for (i = 0; i < arr.length; i++) {
-        if ( arr[i].toString().includes( "LockItem" ) ) {
-            _lockActionBtn = arr[i];
-            break;
+    _lock() {
+        Main.overview.hide();
+        Main.panel.closeQuickSettings();
+        Util.spawn( ['gnome-screensaver-command', '-l'] );
+    };
+
+    _unlock() {
+        Util.spawn( ['gnome-screensaver-command', '-d'] );
+    };
+
+    _reset_kbd_layout()
+    {
+        const sourceman = Keyboard.getInputSourceManager();
+
+        if ( !sourceman ) {
+            return;
+        }
+
+        const idx = sourceman.currentSource.index;
+
+        if ( idx !== 0 ) {
+            sourceman.inputSources[0].activate( true );
         }
     }
 
-    if ( _lockActionBtn )
+    enable()
     {
-        _shieldOnStatusChanged = Main.screenShield._onStatusChanged;
-        _shieldActivate = Main.screenShield.activate;
-        _shieldLock = Main.screenShield.lock;
-        _shieldDeactivate = Main.screenShield.deactivate;
+        this._shieldOnStatusChanged = null;
+        this._shieldActivate = null;
+        this._shieldLock = null;
+        this._shieldDeactivate = null;
 
-        Main.screenShield._onStatusChanged = (status) => {}; // prevents gnome shell message "error: Unable to lock: Lock was blocked by an application"  
-        Main.screenShield.activate = (animate) => { _lock() };
-        Main.screenShield.lock = (animate) => { _lock() };
-        Main.screenShield.deactivate = (animate) => { _unlock() };
+        let _lockActionBtn = null;
+        let arr = Main.panel.statusArea.quickSettings._system._systemItem.child.get_children();
+        for (let i = 0; i < arr.length; i++) {
+            if ( arr[i].toString().includes( "LockItem" ) ) {
+                _lockActionBtn = arr[i];
+                break;
+            }
+        }
 
-        _lockActionBtn.visible = true;
+        if ( _lockActionBtn )
+        {
+            this._shieldOnStatusChanged = Main.screenShield._onStatusChanged;
+            this._shieldActivate = Main.screenShield.activate;
+            this._shieldLock = Main.screenShield.lock;
+            this._shieldDeactivate = Main.screenShield.deactivate;
+
+            Main.screenShield._onStatusChanged = (status) => {}; // prevents gnome shell message "error: Unable to lock: Lock was blocked by an application"
+            Main.screenShield.activate = (animate) => { this._lock() };
+            Main.screenShield.lock = (animate) => { this._lock() };
+            Main.screenShield.deactivate = (animate) => { this._unlock() };
+
+            _lockActionBtn.visible = true;
+
+            Gio.DBus.session.signal_subscribe( null, "org.gnome.ScreenSaver", "ActiveChanged", "/org/gnome/ScreenSaver", null,
+                Gio.DBusSignalFlags.NONE, (connection, sender, path, iface, signal, params) => {
+                    this._reset_kbd_layout();
+                } );
+        }
+    }
+
+    disable()
+    {
+        if ( this._shieldOnStatusChanged ) {
+            Main.screenShield._onStatusChanged = this._shieldOnStatusChanged;
+        }
+        if ( this._shieldActivate ) {
+            Main.screenShield.activate = this._shieldActivate;
+        }
+        if ( this._shieldLock ) {
+            Main.screenShield.lock = this._shieldLock;
+        }
+        if ( this._shieldDeactivate ) {
+            Main.screenShield.deactivate = this._shieldDeactivate;
+        }
     }
 }
-
-function disable()
-{
-    if ( _shieldOnStatusChanged ) {
-        Main.screenShield._onStatusChanged = _shieldOnStatusChanged;
-    }
-    if ( _shieldActivate ) {
-        Main.screenShield.activate = _shieldActivate;
-    }
-    if ( _shieldLock ) {
-        Main.screenShield.lock = _shieldLock;
-    }
-    if ( _shieldDeactivate ) {
-        Main.screenShield.deactivate = _shieldDeactivate;
-    }
-}
-
