@@ -42,32 +42,37 @@ export default class GnomeScreenSaverHack extends Extension
         this._shieldDeactivate = null;
 
         let _lockActionBtn = null;
-        let arr = Main.panel.statusArea.quickSettings._system._systemItem.child.get_children();
-        for (let i = 0; i < arr.length; i++) {
-            if ( arr[i].toString().includes( "LockItem" ) ) {
-                _lockActionBtn = arr[i];
-                break;
+        try
+        {
+            let arr = Main.panel.statusArea.quickSettings._system._systemItem.child.get_children();
+            for (let i = 0; i < arr.length; i++) {
+                if ( arr[i].toString().includes( "LockItem" ) ) {
+                    _lockActionBtn = arr[i];
+                    break;
+                }
             }
         }
+        catch ( e ) {
+            console.log( this.constructor.name + ': ' + e.message );
+        }
 
-        if ( _lockActionBtn )
-        {
-            this._shieldOnStatusChanged = Main.screenShield._onStatusChanged;
-            this._shieldActivate = Main.screenShield.activate;
-            this._shieldLock = Main.screenShield.lock;
-            this._shieldDeactivate = Main.screenShield.deactivate;
+        this._shieldOnStatusChanged = Main.screenShield._onStatusChanged;
+        this._shieldActivate = Main.screenShield.activate;
+        this._shieldLock = Main.screenShield.lock;
+        this._shieldDeactivate = Main.screenShield.deactivate;
 
-            Main.screenShield._onStatusChanged = (status) => {}; // prevents gnome shell message "error: Unable to lock: Lock was blocked by an application"
-            Main.screenShield.activate = (animate) => { this._lock() };
-            Main.screenShield.lock = (animate) => { this._lock() };
-            Main.screenShield.deactivate = (animate) => { this._unlock() };
+        Main.screenShield._onStatusChanged = (status) => {}; // prevents gnome shell message "error: Unable to lock: Lock was blocked by an application"
+        Main.screenShield.activate = (animate) => { this._lock() };
+        Main.screenShield.lock = (animate) => { this._lock() };
+        Main.screenShield.deactivate = (animate) => { this._unlock() };
 
+        Gio.DBus.session.signal_subscribe( null, "org.gnome.ScreenSaver", "ActiveChanged", "/org/gnome/ScreenSaver", null,
+            Gio.DBusSignalFlags.NONE, (connection, sender, path, iface, signal, params) => {
+                this._reset_kbd_layout();
+            } );
+
+        if ( _lockActionBtn ) {
             _lockActionBtn.visible = true;
-
-            Gio.DBus.session.signal_subscribe( null, "org.gnome.ScreenSaver", "ActiveChanged", "/org/gnome/ScreenSaver", null,
-                Gio.DBusSignalFlags.NONE, (connection, sender, path, iface, signal, params) => {
-                    this._reset_kbd_layout();
-                } );
         }
     }
 
